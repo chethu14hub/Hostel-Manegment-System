@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hostel Food Feedback</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for stars -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for the 5-star rating */
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: center;
+            gap: 2px;
+        }
+        .star-rating input[type="radio"] {
+            display: none;
+        }
+        .star-rating label {
+            font-size: 2rem;
+            color: #d1d5db; /* gray-300 */
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .star-rating input[type="radio"]:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #f59e0b; /* amber-500 */
+        }
+
+        /* --- NEW: Style for the "Notepad" (hidden by default) --- */
+        .feedback-notepad {
+            display: none;
+            border-top: 1px solid #e5e7eb; /* gray-200 */
+            padding-top: 1rem; /* pt-4 */
+            margin-top: 1rem; /* mt-4 */
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Weekly Food Feedback</h1>
+        
+        <!-- Global message container -->
+        <div id="message" class="hidden px-4 py-3 rounded-md mb-6" role="alert">
+            <span class="block sm:inline" id="message-text"></span>
+        </div>
+
+        <!-- --- Day Selector --- -->
+        <div class="mb-6 max-w-sm mx-auto">
+            <label for="day-selector" class="block text-sm font-medium text-gray-700 mb-2">Select a day to view:</label>
+            <select id="day-selector" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                <!-- Options will be injected by JavaScript -->
+            </select>
+        </div>
+        
+        <!-- --- Meal Card Grid (now shows 3 cards) --- -->
+        <div id="meal-card-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <!-- Meal cards will be injected here by JavaScript -->
+        </div>
+
+    </div>
+
+    <!-- Modal Structure (hidden by default) -->
+    <div id="feedback-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <!-- ... (The modal HTML is unchanged) ... -->
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h2 id="modal-title" class="text-xl font-bold mb-4">Give Feedback</h2>
+            <div class="star-rating mb-4">
+                <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 stars">&starf;</label>
+                <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 stars">&starf;</label>
+                <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 stars">&starf;</label>
+                <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 stars">&starf;</label>
+                <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 stars">&starf;</label>
+            </div>
+            <div class="mb-6">
+                <label for="comment" class="block text-sm font-medium text-gray-700 mb-2">Comment (Optional)</label>
+                <textarea id="comment" name="comment" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+                
+                <button id="modal-submit-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Submit</button>
+            <footer>
+                <p>Register here
+                <a href="register.html">Register Here</a>
+            </p>
+            
+        </footer>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // 0=Sunday, 1=Monday, ..., 6=Saturday
+        const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        // Meal times (24-hour format for logic)
+        const MEAL_TIMES = {
+            Breakfast: { start: 7, end: 8, feedbackUnlock: 8 }, // 8:00 AM
+            Lunch: { start: 12, end: 13, feedbackUnlock: 13.5 }, // 1:30 PM
+            Dinner: { start: 19, end: 20, feedbackUnlock: 20.5 } // 8:30 PM
+        };
+        
+        // Menu (as provided)
+        const MENU = {
+            Sunday: {
+                Breakfast: "Puri Saagu, Tea/Cofee",
+                Lunch: "Rice, Mixed Bele sambar,Curd,Pickel",
+                Dinner: "Rice,Fish Curry,Veg-Sambar "
+            },
+            Monday: {
+                Breakfast: "Palav,Salad,Mosaru Bajji,Tea",
+                Lunch: "Rice, Mixed Bele sambar,Curd,Pickel",
+                Dinner: "Rice, Bele Smabar, Carrot-Beens curry,Banana"
+            },
+            Tuesday: {
+                Breakfast: "Idli,Sambar,chatny,Tea/Cofee",
+                Lunch: "Rice, Mixed Bele sambar,Majjige,Pickel",
+                Dinner: "Rice,Egg-Sambar,Banana,Tommato Gojju"
+            },
+            Wednesday: {
+                Breakfast: "Dose,sambar,chatny,Tea/Cofee",
+                Lunch: "Rice, Mixed Bele sambar,Curd,Pickel",
+                Dinner: "Chapathi, Rice,Chicken Sambar,Tommato rasam,Banana"
+            },
+            Thursday: {
+                Breakfast: "Chapath, Samabr, Tea/Cofee",
+                Lunch: "Rice, Mixed Bele sambar,Curd,Pickel",
+                Dinner: "Rice Egg -Sambar,Veg-Sambar,Banana"
+            },
+            Friday: {
+                Breakfast: "Tommato-Bath,Menthe-Bath,Chatny,Tea/Coffee",
+                Lunch: "Rice, Mixed Bele sambar,Curd,Pickel",
+                Dinner: "Rice,Bele-saaru, Sweet,Payasa,Gulab Jamoonu"
+            },
+            Saturday: {
+                Breakfast: "Chithrana ,Chatny,Avalalkki,Tea/Coffee",
+                Lunch: "Rice, Mixed Bele sambar,Curd,Pickel",
+                Dinner: "Rice,Egg,Rasam,Banana"
+            }
+        };
+
+        // --- GLOBAL STATE ---
+        let currentFeedback = { day: '', meal: '' };
+        let feedbackData = {};
+        let currentDayName = '';
+
+        // --- DOM ELEMENTS ---
+        const grid = document.getElementById('meal-card-grid');
+        const daySelector = document.getElementById('day-selector');
+        const modal = document.getElementById('feedback-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const modalSubmitBtn = document.getElementById('modal-submit-btn');
+        const commentTextarea = document.getElementById('comment');
+        const starRatingContainer = document.querySelector('.star-rating');
+        const messageDiv = document.getElementById('message');
+        const messageText = document.getElementById('message-text');
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const now = new Date();
+            const nowIST = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+            currentDayName = DAYS_OF_WEEK[nowIST.getDay()];
+
+            buildDaySelector();
+            fetchFeedbackAndShowDay();
+            
+            modalCancelBtn.addEventListener('click', closeModal);
+            modalSubmitBtn.addEventListener('click', submitFeedback);
+            daySelector.addEventListener('change', (e) => showDay(e.target.value));
+        });
+
+        // --- FUNCTIONS ---
+
+        /**
+         * Fetches all existing feedback, then shows the current day's grid.
+         */
+        async function fetchFeedbackAndShowDay() {
+            try {
+                // We MUST use the "complex" API to get the list of entries
+                const response = await fetch(`api_get_feedback.php?t=${new Date().getTime()}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    feedbackData = result.feedback;
+                } else {
+                    console.error('Failed to fetch feedback:', result.message);
+                    showGlobalMessage(result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching feedback:', error);
+                showGlobalMessage('Network error. Could not load feedback.', 'error');
+            }
+            
+            const selectedDay = daySelector.value || currentDayName;
+            showDay(selectedDay);
+        }
+
+        /**
+         * Builds the day selector dropdown
+         */
+        function buildDaySelector() {
+            daySelector.innerHTML = '';
+            // Re-order days to start from Monday for the selector
+            const daysInOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            
+            daysInOrder.forEach(dayName => {
+                const option = document.createElement('option');
+                option.value = dayName;
+                option.textContent = dayName;
+                if (dayName === currentDayName) {
+                    option.selected = true;
+                }
+                daySelector.appendChild(option);
+            });
+        }
+
+        /**
+         * Shows the 3 meal cards for a selected day
+         */
+        function showDay(dayName) {
+            grid.innerHTML = '';
+            
+            const now = new Date();
+            const nowIST = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+            const currentDayIndex = nowIST.getDay();
+            const currentHour = nowIST.getHours() + nowIST.getMinutes() / 60;
+            const selectedDayIndex = DAYS_OF_WEEK.indexOf(dayName);
+
+            for (const mealType in MEAL_TIMES) {
+                const mealState = getMealState(selectedDayIndex, mealType, currentDayIndex, currentHour);
+                const mealCard = createMealCard(dayName, mealType, mealState);
+                grid.appendChild(mealCard);
+            }
+        }
+        
+        /**
+         * Determines the state of a meal (Locked, Open, Active, etc.)
+         * (This is the "unlocked" version)
+         */
+        function getMealState(dayIndex, mealType, currentDayIndex, currentHour) {
+            const mealConfig = MEAL_TIMES[mealType];
+
+            if (dayIndex < currentDayIndex) return 'LOCKED_PAST';
+            if (dayIndex > currentDayIndex) return 'LOCKED_FUTURE';
+            
+            // --- It's the current day ---
+            if (currentHour < mealConfig.feedbackUnlock) return 'LOCKED_FUTURE';
+            
+            // Meal feedback is open
+            return 'OPEN_FOR_FEEDBACK';
+        }
+
+        /**
+         * Creates a single meal card element.
+         * --- THIS IS THE "NOTEPAD" VERSION ---
+         */
+        function createMealCard(dayName, mealType, state) {
+            const card = document.createElement('div');
+            card.className = 'relative p-6 bg-white rounded-lg shadow-md border-2 transition-all';
+            
+            const mealNameEl = document.createElement('h3');
+            mealNameEl.className = 'font-semibold text-xl text-gray-800';
+            mealNameEl.textContent = mealType;
+            
+            const menuEl = document.createElement('p');
+            menuEl.className = 'text-sm text-gray-600 mb-4';
+            menuEl.textContent = MENU[dayName][mealType];
+
+            const button = document.createElement('button');
+            button.className = 'w-full py-2 px-3 rounded-md font-medium text-sm text-white transition-all';
+            
+            const feedbackKey = `${dayName}-${mealType}`;
+            // Use '??' to provide a default empty object if no feedback exists
+            const existingFeedback = feedbackData[feedbackKey] ?? { avg_rating: 0, count: 0, entries: [] };
+
+            const avgRatingEl = document.createElement('div');
+            avgRatingEl.className = 'text-sm text-gray-500 mb-4';
+
+            // --- NEW: "View Reviews" link ---
+            let reviewsLink = '';
+            if (existingFeedback.count > 0) {
+                // Make the "reviews" text a clickable link
+                avgRatingEl.innerHTML = `
+                    <span class="text-amber-500">${renderStars(existingFeedback.avg_rating)}</span>
+                    <span class="font-bold">${existingFeedback.avg_rating.toFixed(1)}/5</span>
+                    <a href="#" class="view-reviews-link text-blue-600 hover:underline" data-key="${feedbackKey}">
+                        (${existingFeedback.count} reviews)
+                    </a>
+                `;
+            } else {
+                avgRatingEl.innerHTML = `<span class="italic">No reviews yet</span>`;
+            }
+
+            // --- NEW: "Notepad" section (hidden by default) ---
+            const notepad = document.createElement('div');
+            // We use the feedbackKey as a unique ID for the notepad
+            notepad.id = `notepad-${feedbackKey}`;
+            notepad.className = 'feedback-notepad'; // This class is in <style>
+            
+            if (existingFeedback.count > 0) {
+                notepad.innerHTML = buildNotepad(existingFeedback.entries);
+            } else {
+                notepad.innerHTML = '<p class="text-sm text-gray-500 italic">No comments submitted.</p>';
+            }
+            // --- End of new notepad ---
+
+
+            switch (state) {
+                case 'OPEN_FOR_FEEDBACK':
+                    card.classList.add('border-blue-500', 'bg-blue-50');
+                    button.textContent = 'Give Feedback';
+                    button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    button.onclick = () => openModal(dayName, mealType);
+                    break;
+                
+                case 'LOCKED_PAST':
+                    card.classList.add('border-gray-200', 'bg-gray-50');
+                    button.textContent = 'Feedback Closed';
+                    button.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    button.disabled = true;
+                    break;
+
+                case 'LOCKED_FUTURE':
+                default:
+                    card.classList.add('border-gray-200', 'bg-white');
+                    button.textContent = 'Feedback Locked';
+                    button.classList.add('bg-gray-300', 'cursor-not-allowed');
+                    button.disabled = true;
+                    break;
+            }
+
+            card.appendChild(mealNameEl);
+            card.appendChild(menuEl);
+            card.appendChild(avgRatingEl);
+            card.appendChild(button);
+            card.appendChild(notepad); // Add the hidden notepad to the card
+
+            // --- NEW: Add click listener for the "View Reviews" link ---
+            const reviewLinkEl = card.querySelector('.view-reviews-link');
+            if (reviewLinkEl) {
+                reviewLinkEl.addEventListener('click', (e) => {
+                    e.preventDefault(); // Stop the link from jumping
+                    const key = e.target.dataset.key;
+                    const notepadToToggle = document.getElementById(`notepad-${key}`);
+                    // Toggle the notepad's display
+                    if (notepadToToggle.style.display === 'block') {
+                        notepadToToggle.style.display = 'none';
+                    } else {
+                        notepadToToggle.style.display = 'block';
+                    }
+                });
+            }
+
+            return card;
+        }
+        
+        /**
+         * --- NEW: Builds the HTML for the "notepad" list ---
+         */
+        function buildNotepad(entries) {
+            if (!entries || entries.length === 0) {
+                return '<p class="text-sm text-gray-500 italic">No comments available.</p>';
+            }
+            
+            let html = '<ul class="divide-y divide-gray-200">';
+            
+            entries.forEach((entry, index) => {
+                html += `
+                    <li class="py-2">
+                        <div class="text-amber-500">${renderStars(entry.rating)}</div>
+                        <p class="text-gray-700 italic">"${entry.comment || 'N/A'}"</p>
+                    </li>
+                `;
+            });
+            
+            html += '</ul>';
+            return html;
+        }
+
+        /**
+         * Renders a number (e.g., 3.5) into 5 star icons.
+         * (This logic is unchanged)
+         */
+        function renderStars(rating) {
+            let stars = '';
+            for (let i = 1; i <= 5; i++) {
+                if (i <= rating) {
+                    stars += '<i class="fas fa-star"></i>'; // Full star
+                } else if (i - 0.5 <= rating) {
+                    stars += '<i class="fas fa-star-half-alt"></i>'; // Half star
+                } else {
+                    stars += '<i class="far fa-star"></i>'; // Empty star
+                }
+            }
+            return stars;
+        }
+
+        /**
+         * Opens the feedback modal.
+         * (This logic is unchanged)
+         */
+        function openModal(dayName, mealType) {
+            currentFeedback = { day: dayName, meal: mealType };
+            
+            modalTitle.textContent = `Feedback for ${dayName} ${mealType}`;
+            commentTextarea.value = '';
+            const stars = starRatingContainer.querySelectorAll('input[type="radio"]');
+            stars.forEach(star => star.checked = false);
+            
+            modal.classList.remove('hidden');
+        }
+
+        /**
+         * Closes the feedback modal.
+         * (This logic is unchanged)
+         */
+        function closeModal() {
+            modal.classList.add('hidden');
+        }
+
+        /**
+         * Submits the feedback to the API.
+         * (This logic is unchanged - "unlocked" version)
+         */
+        async function submitFeedback() {
+            const selectedRating = starRatingContainer.querySelector('input[type="radio"]:checked');
+            const rating = selectedRating ? selectedRating.value : null;
+            const comment = commentTextarea.value;
+
+            if (!rating) {
+                alert('Please select a star rating.');
+                return;
+            }
+
+            try {
+                const response = await fetch('api_submit_feedback.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        day_of_week: currentFeedback.day,
+                        meal_type: currentFeedback.meal,
+                        rating: parseInt(rating),
+                        comment: comment
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal();
+                    showGlobalMessage('Thank you! Your feedback has been submitted.', 'success');
+                    // Re-fetch all data and rebuild the grid
+                    fetchFeedbackAndShowDay(); 
+                } else {
+                    showGlobalMessage(result.message || 'Failed to submit feedback.', 'error');
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                showGlobalMessage('Network error. Could not submit feedback.', 'error');
+            }
+        }
+
+        /**
+         * Shows a global message (success or error).
+         * (This logic is unchanged)
+         */
+        function showGlobalMessage(text, type = 'success') {
+            messageText.textContent = text;
+            if (type === 'success') {
+                messageDiv.className = 'px-4 py-3 rounded-md mb-6 bg-green-100 border border-green-400 text-green-700';
+            } else {
+                messageDiv.className = 'px-4 py-3 rounded-md mb-6 bg-red-100 border-red-400 text-red-700';
+            }
+            setTimeout(() => {
+                messageDiv.className = 'hidden px-4 py-3 rounded-md mb-6';
+            }, 5000);
+        }
+
+    </script>
+</body>
+</html>

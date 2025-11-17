@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hostel Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- NEW: Added Font Awesome for social media icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Hostel Management System</h1>
+        
+        <!-- Message container -->
+        <div id="message" class="hidden px-4 py-3 rounded-md mb-4" role="alert">
+            <span class="block sm:inline" id="message-text"></span>
+        </div>
+
+        <form id="login-form">
+            <div class="mb-4">
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                <input type="text" id="username" name="username" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+            </div>
+            
+            <div class="mb-6">
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" id="password" name="password" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+            </div>
+            
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150">
+                Sign In
+            </button>
+        </form>
+
+        <p class="text-center text-sm text-gray-600 mt-6">
+            Don't have an account? 
+            <a href="/hostel/register.html" class="font-medium text-blue-600 hover:text-blue-500">
+                Register here
+            </a>
+        </p>
+        
+        <p class="text-center text-sm text-gray-600 mt-4">
+            View the menu? 
+            <a href="/hostel/feedback.html" class="font-medium text-green-600 hover:text-green-500">
+                Give Feedback Here
+            </a>
+        </p>
+
+        <!-- UPDATED: Social Media Links -->
+        <div class="border-t border-gray-200 mt-6 pt-4">
+            <!-- UPDATED: Name -->
+            <p class="text-center text-sm text-gray-500 mb-3">Project by Chethan</p>
+            <div class="flex justify-center items-center space-x-6">
+                <!-- UPDATED: Instagram URL -->
+                <a href="https://www.instagram.com/_chxthxn_14" target="_blank" class="text-gray-400 hover:text-gray-600" title="Instagram">
+                    <i class="fab fa-instagram fa-2x"></i>
+                </a>
+                <!-- UPDATED: LinkedIn URL -->
+                <a href="https://www.linkedin.com/in/chethan-gowda-342511263?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app" target="_blank" class="text-gray-400 hover:text-gray-600" title="LinkedIn">
+                    <i class="fab fa-linkedin fa-2x"></i>
+                </a>
+            </div>
+        </div>
+        <!-- END UPDATED -->
+
+    </div>
+
+    <!-- NEW: Copyright Notice -->
+    <p class="text-center text-sm text-gray-500 mt-8">
+        &copy; 2025 @chethan gowda. All rights reserved.
+    </p>
+    <!-- END NEW -->
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const messageDiv = document.getElementById('message');
+            const messageText = document.getElementById('message-text');
+
+            try {
+                // Use a root-relative path
+                const response = await fetch('/hostel/api_login.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show success message
+                    messageText.textContent = 'Login successful! Redirecting...';
+                    messageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+                    messageDiv.classList.add('bg-green-100', 'border-green-400', 'text-green-700');
+                    
+                    // Redirect based on role
+                    if (result.role === 'warden') {
+                        window.location.href = '/hostel/warden_dashboard.html';
+                    } else if (result.role === 'student') {
+                        window.location.href = '/hostel/student_dashboard.html';
+                    } else {
+                        // Fallback for any other case (e.g., null role)
+                        console.warn('Role not defined, defaulting to student dashboard.');
+                        window.location.href = '/hostel/student_dashboard.html';
+                    }
+
+                } else {
+                    // Show error
+                    messageText.textContent = result.message || 'An unknown error occurred.';
+                    messageDiv.classList.remove('hidden', 'bg-green-100', 'border-green-400', 'text-green-700');
+                    messageDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                messageText.textContent = 'A network error occurred. Please try again.';
+                messageDiv.classList.remove('hidden', 'bg-green-100', 'border-green-400', 'text-green-700');
+                messageDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+            }
+        });
+    </script>
+</body>
+</html>
