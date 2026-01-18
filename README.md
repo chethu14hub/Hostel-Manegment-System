@@ -4,7 +4,7 @@ A full-stack web application built with PHP, MySQL, and JavaScript that provides
 
 Features
 
-1. Student Management
+1. Student Management system
 
 Secure Registration & Login: Students can create their own accounts. All passwords are encrypted using password_hash().
 
